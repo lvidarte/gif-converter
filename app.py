@@ -12,7 +12,6 @@ ALLOWED_EXTENSIONS = set(['gif'])
 
 
 app = Flask(__name__)
-app.config['UPLOAD_DIR'] = UPLOAD_DIR
 
 
 def allowed_file(filename):
@@ -24,6 +23,8 @@ def id_generator():
     return ''.join(random.choice(chars) for _ in range(4))
 
 def create_random_dir():
+    if not os.path.exists(UPLOAD_DIR):
+        os.makedirs(UPLOAD_DIR)
     while True:
         dirname = id_generator()
         path = os.path.join(UPLOAD_DIR, dirname)
@@ -33,7 +34,7 @@ def create_random_dir():
 
 @app.route('/<dirname>')
 def show_animation(dirname):
-    files = os.listdir(os.path.join(app.config['UPLOAD_DIR'], dirname))
+    files = os.listdir(os.path.join(UPLOAD_DIR, dirname))
     gif_image = files.pop(files.index('image.gif'))
     png_image = files[0]
     return render_template('show_animation.html',
@@ -43,7 +44,7 @@ def show_animation(dirname):
 
 @app.route('/uploads/<dirname>/<filename>')
 def uploaded_file(dirname, filename):
-    upload_dir = os.path.join(app.config['UPLOAD_DIR'], dirname)
+    upload_dir = os.path.join(UPLOAD_DIR, dirname)
     return send_from_directory(upload_dir, filename)
 
 @app.route('/', methods=['GET', 'POST'])
@@ -52,7 +53,7 @@ def upload_file():
         file = request.files['file']
         if file and allowed_file(file.filename):
             dirname = create_random_dir()
-            upload_dir = os.path.join(app.config['UPLOAD_DIR'], dirname)
+            upload_dir = os.path.join(UPLOAD_DIR, dirname)
             file.save(os.path.join(upload_dir, 'image.gif'))
             convert_gif_to_png(upload_dir, 'image.gif')
             return redirect(url_for('show_animation', dirname=dirname))
