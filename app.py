@@ -1,34 +1,61 @@
 import os
-from flask import Flask, request, redirect, url_for
-from flask import send_from_directory
-from werkzeug import secure_filename
+import string
+import random
 
+from flask import Flask, request, redirect, url_for, \
+                  send_from_directory, render_template
 
-UPLOAD_FOLDER = '/home/xleo/src/lvidarte/gif-converter/uploads'
+from converter import convert_gif_to_png
+
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 ALLOWED_EXTENSIONS = set(['gif'])
 
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_DIR'] = UPLOAD_DIR
 
 
 def allowed_file(filename):
     return '.' in filename and \
         filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+def id_generator():
+    chars = string.ascii_lowercase + string.digits
+    return ''.join(random.choice(chars) for _ in range(4))
+
+def create_random_dir():
+    while True:
+        dirname = id_generator()
+        path = os.path.join(UPLOAD_DIR, dirname)
+        if not os.path.exists(path):
+            os.makedirs(path)
+            return dirname
+
+@app.route('/<dirname>')
+def show_animation(dirname):
+    files = os.listdir(os.path.join(app.config['UPLOAD_DIR'], dirname))
+    gif_image = files.pop(files.index('image.gif'))
+    png_image = files[0]
+    return render_template('show_animation.html',
+                           dirname=dirname,
+                           gif_image=gif_image,
+                           png_image=png_image)
+
+@app.route('/uploads/<dirname>/<filename>')
+def uploaded_file(dirname, filename):
+    upload_dir = os.path.join(app.config['UPLOAD_DIR'], dirname)
+    return send_from_directory(upload_dir, filename)
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
         file = request.files['file']
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            return redirect(url_for('uploaded_file',
-                                    filename=filename))
+            dirname = create_random_dir()
+            upload_dir = os.path.join(app.config['UPLOAD_DIR'], dirname)
+            file.save(os.path.join(upload_dir, 'image.gif'))
+            convert_gif_to_png(upload_dir, 'image.gif')
+            return redirect(url_for('show_animation', dirname=dirname))
     return '''
     <!doctype html>
     <title>Upload new File</title>
@@ -42,5 +69,5 @@ def upload_file():
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
 

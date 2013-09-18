@@ -1,0 +1,106 @@
+{% extends "layout.html" %}
+
+{% block script %}
+    <script defer="defer">
+    $(document).ready(function() {
+
+    var getAnimations = function(image, frames, delays, minDelay) {
+        var width = image.width / frames;
+        var animations = {idle: []};
+
+        for (var i = 0; i < frames; i++) {
+            for (var j = 0; j < delays[i]; j += minDelay) {
+                animations.idle.push({
+                    x: width * i,
+                    y: 0,
+                    width: width,
+                    height: image.height,
+                });
+            }
+        }
+        return animations;
+    };
+
+    var getMinDelay = function(delays) {
+        var min = 999999999;
+        delays.forEach(function(actual) {
+            if (actual < min) {
+                min = actual;
+            }
+        });
+        return min;
+    };
+
+    var imageObj = new Image();
+    imageObj.src = $("#png_image").attr('src');
+
+    imageObj.onload = function() {
+        var src = this.src.split('/');
+        var filename = src[src.length - 1];
+        var values = filename.split('.')[1].split('-');
+        var frames = parseInt(values[0]);
+        var delays = values.slice(1);
+
+        for (var i = 0; i < delays.length; i++) {
+            delays[i] = parseInt(delays[i]);
+        }
+
+        if (delays.length == 1) {
+            var minDelay = delays[0];
+            for (var i = 1; i < frames; i++) {
+                delays.push(minDelay);
+            }
+        } else {
+            var minDelay = getMinDelay(delays);
+        }
+
+        var frameRate = 100 / minDelay;
+
+        var animations = getAnimations(this, frames, delays, minDelay);
+
+        console.log("total frames: " + frames)
+        console.log("frame delays (s/100): " + delays);
+        console.log('min delay: ' + minDelay);
+        console.log('frame rate: ' + frameRate);
+        console.log(animations);
+
+        var stage = new Kinetic.Stage({
+            container: 'container',
+            width: $('#gif_image').width(),
+            height: $('#gif_image').height(),
+        });
+
+        var layer = new Kinetic.Layer();
+
+        var blob = new Kinetic.Sprite({
+          x: 0,
+          y: 0,
+          image: imageObj,
+          animation: 'idle',
+          animations: animations,
+          frameRate: frameRate,
+          index: 0
+        });
+
+        stage.add(layer);
+        layer.add(blob);
+        blob.start();
+    };
+
+    });
+    </script>
+{% endblock %}
+
+{% block content %}
+    sprite
+    <div id="container"></div>
+    <br>
+    {{ gif_image }}
+    <br>
+    <img src="{{ url_for('uploaded_file', dirname=dirname, filename=gif_image) }}" id="gif_image">
+    <br>
+    <br>
+    {{ png_image }}
+    <br>
+    <img src="{{ url_for('uploaded_file', dirname=dirname, filename=png_image) }}" id="png_image">
+{% endblock %}
